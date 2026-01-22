@@ -123,7 +123,7 @@ function KeyValueGrid({ items, columns = 2 }: { items: KeyValueItem[]; columns?:
       {items.map((item) => (
         <div key={item.label} className="space-y-1">
           <dt className="text-xs text-muted-foreground">{item.label}</dt>
-          <dd className="text-sm font-medium">{item.value || "—"}</dd>
+          <dd className="text-sm font-medium">{item.value || "–"}</dd>
           {item.subValue && <dd className="text-xs text-muted-foreground">{item.subValue}</dd>}
         </div>
       ))}
@@ -321,7 +321,7 @@ function CoverageDetailsSection({ data }: { data: InsurancePlanReport["coverageD
                     <tr key={i} className="border-b last:border-0">
                       <td className="px-3 py-2">{item.service}</td>
                       <td className="px-3 py-2">{item.coverage}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{item.limitations || "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{item.limitations || "–"}</td>
                       <td className="px-3 py-2 text-center">
                         {item.priorAuth ? (
                           <span className="text-yellow-600">Required</span>

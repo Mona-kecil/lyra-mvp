@@ -11,38 +11,40 @@ const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY!,
 });
 
+const NA = "–";
+
 const InsurancePlanReportSchema = z.object({
   planOverview: z.object({
     planName: z.string().describe("Name of the insurance plan"),
     carrier: z.string().describe("Insurance carrier/company name"),
     planType: z.string().describe("Type of plan (e.g., PPO, HMO, EPO, POS)"),
-    effectiveDate: z.string().optional().describe("Plan effective date if visible"),
-    groupNumber: z.string().optional().describe("Group number if visible"),
+    effectiveDate: z.string().default(NA).describe(`Plan effective date if visible, or "${NA}" if not found`),
+    groupNumber: z.string().default(NA).describe(`Group number if visible, or "${NA}" if not found`),
   }),
 
   costSharing: z.object({
     deductible: z
       .object({
-        individual: z.string().optional(),
-        family: z.string().optional(),
-        inNetwork: z.string().optional(),
-        outOfNetwork: z.string().optional(),
+        individual: z.string().default(NA),
+        family: z.string().default(NA),
+        inNetwork: z.string().default(NA),
+        outOfNetwork: z.string().default(NA),
       })
-      .describe("Deductible amounts"),
+      .describe(`Deductible amounts. Use "${NA}" for values not found in the document`),
     outOfPocketMax: z
       .object({
-        individual: z.string().optional(),
-        family: z.string().optional(),
-        inNetwork: z.string().optional(),
-        outOfNetwork: z.string().optional(),
+        individual: z.string().default(NA),
+        family: z.string().default(NA),
+        inNetwork: z.string().default(NA),
+        outOfNetwork: z.string().default(NA),
       })
-      .describe("Out-of-pocket maximum amounts"),
+      .describe(`Out-of-pocket maximum amounts. Use "${NA}" for values not found`),
     copays: z
       .array(
         z.object({
           service: z.string().describe("Service type (e.g., Primary Care Visit, Specialist)"),
           amount: z.string().describe("Copay amount"),
-          notes: z.string().optional().describe("Additional notes or conditions"),
+          notes: z.string().default(NA).describe(`Additional notes or conditions, or "${NA}" if none`),
         }),
       )
       .describe("Copay amounts for various services"),
@@ -50,8 +52,11 @@ const InsurancePlanReportSchema = z.object({
       .array(
         z.object({
           service: z.string().describe("Service type"),
-          inNetwork: z.string().optional().describe("In-network coinsurance percentage"),
-          outOfNetwork: z.string().optional().describe("Out-of-network coinsurance percentage"),
+          inNetwork: z.string().default(NA).describe(`In-network coinsurance percentage, or "${NA}" if not found`),
+          outOfNetwork: z
+            .string()
+            .default(NA)
+            .describe(`Out-of-network coinsurance percentage, or "${NA}" if not found`),
         }),
       )
       .describe("Coinsurance percentages"),
@@ -65,8 +70,8 @@ const InsurancePlanReportSchema = z.object({
           z.object({
             service: z.string().describe("Specific service or benefit"),
             coverage: z.string().describe("Coverage description"),
-            limitations: z.string().optional().describe("Any limitations or exclusions"),
-            priorAuth: z.boolean().optional().describe("Whether prior authorization is required"),
+            limitations: z.string().default(NA).describe(`Any limitations or exclusions, or "${NA}" if none`),
+            priorAuth: z.boolean().default(false).describe("Whether prior authorization is required"),
           }),
         ),
       }),
@@ -79,15 +84,14 @@ const InsurancePlanReportSchema = z.object({
         .array(
           z.object({
             tier: z.string().describe("Tier name (e.g., Tier 1 - Generic)"),
-            copay: z.string().optional().describe("Copay amount"),
-            coinsurance: z.string().optional().describe("Coinsurance percentage"),
+            copay: z.string().default(NA).describe(`Copay amount, or "${NA}" if not applicable`),
+            coinsurance: z.string().default(NA).describe(`Coinsurance percentage, or "${NA}" if not applicable`),
           }),
         )
-        .optional(),
-      deductible: z.string().optional().describe("Prescription drug deductible if separate"),
-      mailOrder: z.string().optional().describe("Mail order pharmacy benefits"),
+        .default([]),
+      deductible: z.string().default(NA).describe(`Prescription drug deductible if separate, or "${NA}"`),
+      mailOrder: z.string().default(NA).describe(`Mail order pharmacy benefits, or "${NA}" if not found`),
     })
-    .optional()
     .describe("Prescription drug coverage details"),
 
   additionalBenefits: z
@@ -97,11 +101,12 @@ const InsurancePlanReportSchema = z.object({
         details: z.string().describe("Benefit details and coverage"),
       }),
     )
-    .optional()
+    .default([])
     .describe("Additional benefits (dental, vision, wellness, etc.)"),
 
   importantNotes: z
     .array(z.string())
+    .default([])
     .describe("Important notes, exclusions, or things the practice should be aware of"),
 
   extractedFields: z
@@ -109,7 +114,7 @@ const InsurancePlanReportSchema = z.object({
       z.object({
         fieldName: z.string().describe("Name/label of the field"),
         fieldValue: z.string().describe("Value of the field"),
-        category: z.string().optional().describe("Category this field belongs to"),
+        category: z.string().default("Other").describe("Category this field belongs to"),
         confidence: z.enum(["high", "medium", "low"]).describe("Confidence in extraction accuracy"),
       }),
     )
@@ -122,11 +127,11 @@ const InsurancePlanReportSchema = z.object({
     imageQuality: z.enum(["good", "fair", "poor"]).describe("Quality of the document image"),
     missingInfo: z
       .array(z.string())
-      .optional()
+      .default([])
       .describe("Information that appears to be missing or unclear"),
     suggestedActions: z
       .array(z.string())
-      .optional()
+      .default([])
       .describe("Suggested actions (e.g., request clearer copy, verify with carrier)"),
   }),
 });
@@ -136,8 +141,8 @@ export type InsurancePlanReport = z.infer<typeof InsurancePlanReportSchema>;
 const SYSTEM_PROMPT = `You are Lyra, an expert insurance benefit analyst for healthcare practices. Your job is to analyze insurance plan documents (PDFs, images of benefit summaries, EOBs, etc.) and extract structured benefit information.
 
 Guidelines:
-1. Extract ALL visible information from the document, even if some fields are empty
-2. For any values you cannot clearly read or find, use null/empty rather than guessing
+1. Extract ALL visible information from the document
+2. For any values you cannot clearly read or find, use "–" (en-dash) rather than leaving empty or guessing
 3. Pay special attention to:
    - Deductibles (individual vs family, in-network vs out-of-network)
    - Out-of-pocket maximums

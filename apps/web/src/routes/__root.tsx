@@ -14,11 +14,12 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({
     meta: [
       {
-        title: "lyra-mvp",
+        title: "Lyra – Benefit Intelligence Platform",
       },
       {
         name: "description",
-        content: "lyra-mvp is a web application",
+        content:
+          "Upload insurance plans and run AI-powered benefit analysis for your healthcare practice.",
       },
     ],
     links: [
@@ -38,11 +39,13 @@ function RootComponent() {
         attribute="class"
         defaultTheme="dark"
         disableTransitionOnChange
-        storageKey="vite-ui-theme"
+        storageKey="lyra-ui-theme"
       >
-        <div className="grid grid-rows-[auto_1fr] h-svh">
+        <div className="flex min-h-svh flex-col">
           <Header />
-          <Outlet />
+          <main className="flex-1">
+            <Outlet />
+          </main>
         </div>
         <Toaster richColors />
       </ThemeProvider>

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@convex-dev/better-auth": "catalog:",
+    "ai": "^6.0.46",
     "better-auth": "catalog:",
     "convex": "catalog:",
     "dotenv": "catalog:",

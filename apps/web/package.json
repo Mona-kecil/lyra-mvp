@@ -11,6 +11,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/react": "^3.0.48",
     "@base-ui/react": "^1.0.0",
     "@convex-dev/better-auth": "catalog:",
     "@hookform/resolvers": "^5.1.1",

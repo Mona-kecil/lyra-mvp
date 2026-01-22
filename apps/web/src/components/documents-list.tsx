@@ -240,7 +240,6 @@ export default function DocumentsList() {
 
               <Button
                 size="xs"
-                variant="outline"
                 disabled={!canRunLyra || isProcessing}
                 onClick={(e) => handleRunLyra(e, doc._id)}
               >

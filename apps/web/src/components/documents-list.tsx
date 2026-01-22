@@ -1,12 +1,21 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@lyra-mvp/backend/convex/_generated/api";
 import type { Id } from "@lyra-mvp/backend/convex/_generated/dataModel";
 
 import InsuranceReport from "@/components/insurance-report";
+import {
+  AlertDialog,
+  AlertDialogBackdrop,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -117,7 +126,12 @@ interface DocumentWithUrl {
 export default function DocumentsList() {
   const documents = useQuery(api.documents.listDocuments) as DocumentWithUrl[] | undefined;
   const runLyra = useMutation(api.analyses.runLyra);
+  const deleteDocument = useMutation(api.documents.deleteDocument);
   const [expandedDoc, setExpandedDoc] = useState<Id<"documents"> | null>(null);
+  const [deletingId, setDeletingId] = useState<Id<"documents"> | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: Id<"documents">; filename: string } | null>(
+    null,
+  );
 
   async function handleRunLyra(e: React.MouseEvent, documentId: Id<"documents">) {
     e.stopPropagation();
@@ -127,6 +141,28 @@ export default function DocumentsList() {
       setExpandedDoc(documentId);
     } catch {
       toast.error("Failed to start analysis");
+    }
+  }
+
+  function openDeleteDialog(e: React.MouseEvent, id: Id<"documents">, filename: string) {
+    e.stopPropagation();
+    setDeleteTarget({ id, filename });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget.id);
+    setDeleteTarget(null);
+    try {
+      await deleteDocument({ documentId: deleteTarget.id });
+      toast.success("Document deleted");
+      if (expandedDoc === deleteTarget.id) {
+        setExpandedDoc(null);
+      }
+    } catch {
+      toast.error("Failed to delete document");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -143,8 +179,9 @@ export default function DocumentsList() {
   }
 
   return (
-    <div className="space-y-2">
-      {documents.map((doc) => {
+    <>
+      <div className="space-y-2">
+        {documents.map((doc) => {
         const isExpanded = expandedDoc === doc._id;
         const isProcessing = doc.status === "queued" || doc.status === "processing";
         const canRunLyra = doc.status === "uploaded" || doc.status === "error";
@@ -209,6 +246,17 @@ export default function DocumentsList() {
               >
                 {isProcessing ? "Running…" : "Run Lyra"}
               </Button>
+
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                disabled={isProcessing || deletingId === doc._id}
+                onClick={(e) => openDeleteDialog(e, doc._id, doc.filename)}
+                aria-label={`Delete ${doc.filename}`}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
             </div>
 
             {isExpanded && (
@@ -219,6 +267,23 @@ export default function DocumentsList() {
           </div>
         );
       })}
-    </div>
+      </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogBackdrop />
+        <AlertDialogPopup>
+          <AlertDialogTitle>Delete document?</AlertDialogTitle>
+          <AlertDialogDescription>
+            "{deleteTarget?.filename}" and any associated analyses will be permanently deleted.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="outline">Cancel</Button>} />
+            <Button variant="destructive" onClick={confirmDelete}>
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+    </>
   );
 }

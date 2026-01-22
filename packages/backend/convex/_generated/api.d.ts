@@ -8,9 +8,13 @@
  * @module
  */
 
+import type * as analyses from "../analyses.js";
 import type * as auth from "../auth.js";
+import type * as documents from "../documents.js";
 import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
+import type * as lyra from "../lyra.js";
+import type * as practices from "../practices.js";
 import type * as privateData from "../privateData.js";
 
 import type {
@@ -20,9 +24,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  analyses: typeof analyses;
   auth: typeof auth;
+  documents: typeof documents;
   healthCheck: typeof healthCheck;
   http: typeof http;
+  lyra: typeof lyra;
+  practices: typeof practices;
   privateData: typeof privateData;
 }>;
 

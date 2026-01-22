@@ -151,7 +151,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
           );
         }}
       >
-        {isAnonymousLoading ? "Signing in..." : "Try Without Account"}
+        {isAnonymousLoading ? "Signing in..." : "Try Anonymously"}
       </Button>
 
       <div className="mt-4 text-center">

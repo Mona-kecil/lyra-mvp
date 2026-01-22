@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -10,6 +12,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
 export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
+  const [isAnonymousLoading, setIsAnonymousLoading] = useState(false);
   const navigate = useNavigate({
     from: "/",
   });
@@ -116,6 +119,40 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
           )}
         </form.Subscribe>
       </form>
+
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">Or</span>
+        </div>
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        disabled={isAnonymousLoading}
+        onClick={async () => {
+          setIsAnonymousLoading(true);
+          await authClient.signIn.anonymous(
+            {},
+            {
+              onSuccess: () => {
+                navigate({ to: "/dashboard" });
+                toast.success("Signed in as guest");
+              },
+              onError: (error) => {
+                toast.error(error.error.message || "Failed to sign in anonymously");
+                setIsAnonymousLoading(false);
+              },
+            },
+          );
+        }}
+      >
+        {isAnonymousLoading ? "Signing in..." : "Try Without Account"}
+      </Button>
 
       <div className="mt-4 text-center">
         <Button

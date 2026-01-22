@@ -25,7 +25,8 @@ export const getOrCreatePractice = mutation({
     }
 
     const now = Date.now();
-    const practiceName = `${user.email}'s Practice`;
+    const isAnonymous = user.email?.startsWith("temp-") || user.email?.startsWith("temp@");
+    const practiceName = isAnonymous ? "Guest Practice" : `${user.email}'s Practice`;
 
     const practiceId = await ctx.db.insert("practices", {
       name: practiceName,

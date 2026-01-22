@@ -117,3 +117,27 @@ export const getDocument = query({
     };
   },
 });
+
+export const deleteDocument = mutation({
+  args: { documentId: v.id("documents") },
+  handler: async (ctx, args) => {
+    const user = await requireAuth(ctx);
+
+    const document = await ctx.db.get(args.documentId);
+    if (!document) throw new Error("Document not found");
+
+    await verifyPracticeAccess(ctx, document.practiceId, user._id);
+
+    const analyses = await ctx.db
+      .query("analyses")
+      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+      .collect();
+
+    for (const analysis of analyses) {
+      await ctx.db.delete(analysis._id);
+    }
+
+    await ctx.storage.delete(document.storageId);
+    await ctx.db.delete(args.documentId);
+  },
+});

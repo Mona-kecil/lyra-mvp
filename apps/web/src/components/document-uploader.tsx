@@ -1,102 +1,99 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { api } from "@lyra-mvp/backend/convex/_generated/api";
 import { useMutation } from "convex/react";
-import { FileText, Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-
 const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-type UploadStatus = "idle" | "uploading" | "success" | "error";
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 export default function DocumentUploader({ onUploadComplete }: { onUploadComplete?: () => void }) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [status, setStatus] = useState<UploadStatus>("idle");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
   const createDocument = useMutation(api.documents.createDocument);
 
-  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    setErrorMessage(null);
-    setStatus("idle");
+  const uploadFile = useCallback(
+    async (file: File) => {
+      setErrorMessage(null);
 
-    if (!file) {
-      setSelectedFile(null);
-      return;
-    }
-
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setErrorMessage("Invalid file type. Please select a PDF, PNG, or JPG file.");
-      setSelectedFile(null);
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      setErrorMessage("File is too large. Maximum size is 10MB.");
-      setSelectedFile(null);
-      return;
-    }
-
-    setSelectedFile(file);
-  }
-
-  function clearSelection() {
-    setSelectedFile(null);
-    setErrorMessage(null);
-    setStatus("idle");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
-  async function handleUpload() {
-    if (!selectedFile) return;
-
-    setStatus("uploading");
-    setErrorMessage(null);
-
-    try {
-      const uploadUrl = await generateUploadUrl();
-
-      const response = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": selectedFile.type },
-        body: selectedFile,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload file to storage");
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        setErrorMessage("Invalid file type. Please select a PDF, PNG, or JPG file.");
+        return;
       }
 
-      const { storageId } = await response.json();
+      if (file.size > MAX_FILE_SIZE) {
+        setErrorMessage("File is too large. Maximum size is 20MB.");
+        return;
+      }
 
-      await createDocument({
-        storageId,
-        filename: selectedFile.name,
-        contentType: selectedFile.type,
-        sizeBytes: selectedFile.size,
-      });
+      setIsUploading(true);
 
-      setStatus("success");
-      toast.success("Document uploaded successfully");
-      onUploadComplete?.();
-      clearSelection();
-    } catch (error) {
-      setStatus("error");
-      const message = error instanceof Error ? error.message : "Upload failed";
-      setErrorMessage(`${message}. Please try again.`);
+      try {
+        const uploadUrl = await generateUploadUrl();
+
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to upload file to storage");
+        }
+
+        const { storageId } = await response.json();
+
+        await createDocument({
+          storageId,
+          filename: file.name,
+          contentType: file.type,
+          sizeBytes: file.size,
+        });
+
+        toast.success(`${file.name} uploaded`);
+        onUploadComplete?.();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Upload failed";
+        setErrorMessage(`${message}. Please try again.`);
+      } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    },
+    [generateUploadUrl, createDocument, onUploadComplete],
+  );
+
+  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) {
+      uploadFile(file);
+    }
+  }
+
+  function handleDragOver(event: React.DragEvent) {
+    event.preventDefault();
+    setIsDragOver(true);
+  }
+
+  function handleDragLeave(event: React.DragEvent) {
+    event.preventDefault();
+    setIsDragOver(false);
+  }
+
+  function handleDrop(event: React.DragEvent) {
+    event.preventDefault();
+    setIsDragOver(false);
+
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      uploadFile(file);
     }
   }
 
@@ -105,7 +102,7 @@ export default function DocumentUploader({ onUploadComplete }: { onUploadComplet
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <input
         ref={fileInputRef}
         type="file"
@@ -113,33 +110,36 @@ export default function DocumentUploader({ onUploadComplete }: { onUploadComplet
         onChange={handleFileSelect}
         className="sr-only"
         aria-label="Select document file"
+        disabled={isUploading}
       />
 
-      <Button type="button" variant="outline" onClick={triggerFileInput}>
-        <Upload data-icon="inline-start" />
-        Select File
-      </Button>
-
-      {selectedFile && (
-        <div className="flex items-center gap-3 rounded border border-border bg-muted/50 p-3">
-          <FileText className="size-5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{selectedFile.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {formatFileSize(selectedFile.size)} · {selectedFile.type.split("/")[1].toUpperCase()}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={clearSelection}
-            aria-label="Remove selected file"
-          >
-            <X />
-          </Button>
-        </div>
-      )}
+      <button
+        type="button"
+        onClick={triggerFileInput}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        disabled={isUploading}
+        className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-6 py-8 transition-colors ${
+          isDragOver
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/50"
+        } ${isUploading ? "pointer-events-none opacity-50" : ""}`}
+        aria-label="Drop file here or click to select"
+      >
+        {isUploading ? (
+          <>
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+            <span className="mt-2 text-sm text-muted-foreground">Uploading…</span>
+          </>
+        ) : (
+          <>
+            <Upload className="size-8 text-muted-foreground" />
+            <span className="mt-2 text-sm font-medium">Drop file here or click to select</span>
+            <span className="mt-1 text-xs text-muted-foreground">PDF, PNG, JPG up to 20MB</span>
+          </>
+        )}
+      </button>
 
       {errorMessage && (
         <p className="text-sm text-destructive" role="alert">
@@ -148,28 +148,8 @@ export default function DocumentUploader({ onUploadComplete }: { onUploadComplet
       )}
 
       <div aria-live="polite" className="sr-only">
-        {status === "uploading" && "Uploading document…"}
-        {status === "success" && "Document uploaded successfully"}
-        {status === "error" && errorMessage}
+        {isUploading && "Uploading document…"}
       </div>
-
-      {selectedFile && (
-        <Button
-          type="button"
-          onClick={handleUpload}
-          disabled={status === "uploading"}
-          className="w-full"
-        >
-          {status === "uploading" ? (
-            <>
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-              Uploading…
-            </>
-          ) : (
-            "Upload Document"
-          )}
-        </Button>
-      )}
     </div>
   );
 }
